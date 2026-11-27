@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulator Sidang UU ITE (Rust Edition)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            rust: {
+              DEFAULT: '#F74C00',
+              hover: '#E04400',
+              glow: 'rgba(247, 76, 0, 0.25)',
+            },
+            slatebg: '#0F172A',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Custom scrollbar untuk nuansa terminal modern */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0F172A;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #F74C00;
+    }
+  </style>
+</head>
+<body class="bg-[#0F172A] text-slate-100 font-sans antialiased min-h-screen selection:bg-[#F74C00] selection:text-white">
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-slate-800 border border-[#F74C00] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-medium">
+      <span class="flex h-2.5 w-2.5 rounded-full bg-[#F74C00] animate-ping"></span>
+      <span id="toast-msg">Hasil sidang berhasil disalin untuk Threads!</span>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="max-w-4xl mx-auto px-4 py-6 sm:py-10 space-y-6">
+
+    <!-- 1. Header & Badge Status -->
+    <header class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+      <div class="absolute -top-24 -right-24 w-56 h-56 bg-[#F74C00]/15 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
+        <div class="space-y-1.5">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#F74C00]/15 border border-[#F74C00]/40 text-[#F74C00] font-mono text-xs font-semibold">
+            <span>🦀</span>
+            <span>#![forbid(unsafe_code)]</span>
+          </div>
+          <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+            UU ITE Compiler & Simulator <span class="text-[#F74C00]">(UU No. 1/2024)</span>
+          </h1>
+          <p class="text-slate-400 text-sm sm:text-base font-medium">
+            Memory-Safe Law Engine — <span class="text-slate-200 font-mono text-xs sm:text-sm">Zero Pasal Karet</span>
+          </p>
+        </div>
+
+        <div class="flex sm:flex-col items-start sm:items-end justify-between gap-2 text-xs font-mono text-slate-400 bg-slate-950/70 px-3.5 py-2.5 rounded-xl border border-slate-800">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>rustc 1.84.0-stable</span>
+          </div>
+          <span class="text-slate-500">edition = "2024"</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. Preset Skenario Cepat -->
+    <section class="space-y-2.5">
+      <div class="flex items-center justify-between px-1">
+        <h2 class="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
+          ⚡ Preset Skenario Cepat (Klik untuk Isi Otomatis)
+        </h2>
+      </div>
+      <div class="flex flex-wrap gap-2" id="preset-container">
+        <button type="button" onclick="applyPreset('kritik_publik')" class="preset-btn px-3.5 py-2 rounded-full text-xs sm:text-sm font-medium bg-slate-800/90 hover:bg-[#F74C00] text-slate-200 hover:text-white border border-slate-700 hover:border-[#F74C00] transition-all active:scale-95">
+          🏛️ Kritik Fasilitas Publik di Threads
+        </button>
+        <button type="button" onclick="applyPreset('institusi_gugat')" class="preset-btn px-3.5 py-2 rounded-full text-xs sm:text-sm font-medium bg-slate-800/90 hover:bg-[#F74C00] text-slate-200 hover:text-white border border-slate-700 hover:border-[#F74C00] transition-all active:scale-95">
+          🏢 Institusi Gugat Pencemaran Nama Baik
+        </button>
+        <button type="button" onclick="applyPreset('fitnah_individu')" class="preset-btn px-3.5 py-2 rounded-full text-xs sm:text-sm font-medium bg-slate-800/90 hover:bg-[#F74C00] text-slate-200 hover:text-white border border-slate-700 hover:border-[#F74C00] transition-all active:scale-95">
+          🎯 Fitnah Individu + Bukti Lengkap
+        </button>
+        <button type="button" onclick="applyPreset('curhat_konsumen')" class="preset-btn px-3.5 py-2 rounded-full text-xs sm:text-sm font-medium bg-slate-800/90 hover:bg-[#F74C00] text-slate-200 hover:text-white border border-slate-700 hover:border-[#F74C00] transition-all active:scale-95">
+          🛍️ Curhat Konsumen Kecewa (Opini)
+        </button>
+        <button type="button" onclick="applyPreset('bukti_editan')" class="preset-btn px-3.5 py-2 rounded-full text-xs sm:text-sm font-medium bg-slate-800/90 hover:bg-[#F74C00] text-slate-200 hover:text-white border border-slate-700 hover:border-[#F74C00] transition-all active:scale-95">
+          🖼️ Screenshot Editan / Tidak Autentik
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. Panel Input Parameter Sidang -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+          <span class="text-[#F74C00] font-mono">struct</span> ParameterSidang
+        </h2>
+        <span class="text-xs font-mono text-slate-500">src/main.rs</span>
+      </div>
+
+      <!-- Input Teks Postingan -->
+      <div class="space-y-2">
+        <label for="post-text" class="block text-sm font-medium text-slate-300">
+          Isi Postingan / Ucapan Elektronik (<code class="text-[#F74C00] font-mono text-xs">record.content</code>)
+        </label>
+        <textarea id="post-text" rows="2" class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-[#F74C00] focus:ring-2 focus:ring-[#F74C00]/20 text-slate-100 p-3.5 text-sm outline-none transition-all resize-none" placeholder="Tulis isi postingan di sini...">Pelayanan di kantor ini lambat banget dan sistemnya sering down!</textarea>
+      </div>
+
+      <!-- Grid Select: SpeechContext & LegalStanding -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- SpeechContext -->
+        <div class="space-y-2">
+          <label for="speech-context" class="block text-sm font-medium text-slate-300">
+            Konteks Ucapan (<code class="text-[#F74C00] font-mono text-xs">SpeechContext</code>)
+          </label>
+          <select id="speech-context" class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-[#F74C00] focus:ring-2 focus:ring-[#F74C00]/20 text-slate-100 p-3 text-sm outline-none transition-all">
+            <option value="PublicInterestCriticism">PublicInterestCriticism (Kritik Kepentingan Umum - Pasal 27A ayat 3)</option>
+            <option value="SatireOrOpinion">SatireOrOpinion (Satire / Ekspresi Opini)</option>
+            <option value="SelfDefense">SelfDefense (Pembelaan Diri - Pasal 27A ayat 3)</option>
+            <option value="DefamatoryAttack">DefamatoryAttack (Serangan Kehormatan / Pencemaran Nama Baik - Pasal 27A ayat 1)</option>
+            <option value="ConsumerFraud">ConsumerFraud (Penipuan Konsumen / Berita Bohong Rugi Materiil - Pasal 28 ayat 1)</option>
+          </select>
+        </div>
+
+        <!-- LegalStanding -->
+        <div class="space-y-2">
+          <label for="legal-standing" class="block text-sm font-medium text-slate-300">
+            Pihak Pelapor (<code class="text-[#F74C00] font-mono text-xs">LegalStanding</code>)
+          </label>
+          <select id="legal-standing" class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-[#F74C00] focus:ring-2 focus:ring-[#F74C00]/20 text-slate-100 p-3 text-sm outline-none transition-all">
+            <option value="InstitutionOrCorporation">InstitutionOrCorporation (Institusi / Perusahaan / Badan Hukum)</option>
+            <option value="DirectIndividualVictim">DirectIndividualVictim (Korban Individu Langsung)</option>
+            <option value="ThirdPartyBystander">ThirdPartyBystander (Pihak Ketiga / Netizen Lain)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Toggle Switch Parameter Hukum -->
+      <div class="space-y-3 pt-1">
+        <span class="block text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
+          Flag & Validasi Barang Bukti (Boolean Assertions)
+        </span>
+
+        <div class="grid grid-cols-1 gap-3">
+          <!-- Toggle 1: Bukti Autentik -->
+          <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 cursor-pointer transition-all">
+            <div class="pr-3">
+              <div class="text-sm font-semibold text-slate-200">Bukti Elektronik Autentik & Utuh</div>
+              <div class="text-xs font-mono text-slate-400 mt-0.5">Pasal 6: is_authentic && is_accessible</div>
+            </div>
+            <div class="relative inline-flex items-center shrink-0">
+              <input type="checkbox" id="toggle-authentic" class="sr-only peer" checked />
+              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F74C00]"></div>
+            </div>
+          </label>
+
+          <!-- Toggle 2: Fakta Bohong -->
+          <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 cursor-pointer transition-all">
+            <div class="pr-3">
+              <div class="text-sm font-semibold text-slate-200">Ada Fakta Bohong yang Dapat Dibuktikan</div>
+              <div class="text-xs font-mono text-slate-400 mt-0.5">verifiable_false_statement: bool</div>
+            </div>
+            <div class="relative inline-flex items-center shrink-0">
+              <input type="checkbox" id="toggle-falsehood" class="sr-only peer" />
+              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F74C00]"></div>
+            </div>
+          </label>
+
+          <!-- Toggle 3: Kerugian Materiil -->
+          <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 cursor-pointer transition-all">
+            <div class="pr-3">
+              <div class="text-sm font-semibold text-slate-200">Ada Kerugian Materiil Nyata</div>
+              <div class="text-xs font-mono text-slate-400 mt-0.5">material_loss_idr &gt; 0 (Pasal 28 ayat 1)</div>
+            </div>
+            <div class="relative inline-flex items-center shrink-0">
+              <input type="checkbox" id="toggle-loss" class="sr-only peer" />
+              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F74C00]"></div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 4. Tombol Aksi Utama -->
+      <div class="pt-2">
+        <button type="button" id="run-btn" onclick="runSimulation()" class="w-full py-4 px-6 rounded-xl bg-[#F74C00] hover:bg-[#E04400] active:scale-[0.99] text-white font-mono font-bold text-sm sm:text-base tracking-wide shadow-lg shadow-[#F74C00]/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer">
+          <span id="run-icon">▶</span>
+          <span id="run-label">JALANKAN PUTUSAN (cargo run)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 5. Panel Hasil Vonis & Output Compiler -->
+    <section id="output-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+          <span class="text-emerald-400 font-mono">$</span> Output Terminal & Putusan
+        </h2>
+        <span id="compile-badge" class="text-xs font-mono px-2.5 py-1 rounded-md bg-slate-800 text-slate-300">
+          Finished in 0.42s
+        </span>
+      </div>
+
+      <!-- Terminal Log ala cargo run -->
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs sm:text-sm space-y-1.5 overflow-x-auto">
+        <div class="text-slate-400">$ cargo run --release --bin sidang_uu_ite</div>
+        <div id="terminal-log" class="space-y-1 text-slate-300">
+          <div><span class="text-emerald-400 font-semibold">   Compiling</span> uu_ite_engine v1.2024.0 (/law/indonesia)</div>
+          <div><span class="text-emerald-400 font-semibold">    Finished</span> `release` profile [optimized] target(s) in 0.42s</div>
+          <div><span class="text-emerald-400 font-semibold">     Running</span> `target/release/sidang_uu_ite`</div>
+        </div>
+      </div>
+
+      <!-- Kartu Vonis Besar -->
+      <div id="verdict-card" class="rounded-2xl border-2 p-5 sm:p-6 transition-all duration-300 bg-emerald-950/30 border-emerald-500/60">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <span id="verdict-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 w-fit">
+            ✓ BEBAS / DILINDUNGI KONSTITUSI
+          </span>
+          <span id="verdict-article" class="text-xs font-mono text-slate-300 bg-slate-950/60 px-3 py-1 rounded-lg border border-slate-800">
+            Pasal 27A ayat (3) UU No. 1/2024
+          </span>
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-xs font-mono text-slate-400">Return Value:</div>
+          <h3 id="verdict-enum" class="text-base sm:text-xl font-mono font-bold text-emerald-300 break-all">
+            Ok(Verdict::ProtectedConstitutionalSpeech)
+          </h3>
+          <p id="verdict-desc" class="text-sm sm:text-base text-slate-200 leading-relaxed pt-1">
+            Ucapan diklasifikasikan sebagai kritik untuk kepentingan umum. Undang-undang secara eksplisit mengecualikan perbuatan ini dari pemidanaan pencemaran nama baik.
+          </p>
+        </div>
+
+        <!-- Tombol Salin Teks Hasil untuk Threads -->
+        <div class="mt-5 pt-4 border-t border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span class="text-xs text-slate-400">Siap pamerkan hasil sidang ini ke timeline?</span>
+          <button type="button" onclick="copyForThreads()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer">
+            <span>📋</span>
+            <span>Salin Teks Hasil untuk Threads</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Bagian "Lihat Kode Rust yang Dieksekusi" (Collapsible / Accordion) -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <button type="button" onclick="toggleCodeAccordion()" class="w-full p-5 sm:px-6 flex items-center justify-between text-left hover:bg-slate-800/50 transition-colors cursor-pointer">
+        <div class="flex items-center gap-2.5">
+          <span class="text-[#F74C00] font-mono font-bold">&lt;/&gt;</span>
+          <span class="font-bold text-sm sm:text-base text-white">Lihat Kode Rust yang Dieksekusi</span>
+          <span class="hidden sm:inline-block text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+            match arm highlighted
+          </span>
+        </div>
+        <span id="accordion-arrow" class="text-slate-400 font-mono text-sm transform transition-transform duration-200">▼</span>
+      </button>
+
+      <div id="code-accordion-body" class="hidden border-t border-slate-800 bg-slate-950 p-4 sm:p-5 overflow-x-auto">
+        <div class="text-xs font-mono text-slate-400 mb-3 flex items-center justify-between">
+          <span>src/adjudicate.rs — Cabang yang dieksekusi disorot oranye</span>
+          <span id="active-arm-label" class="text-[#F74C00] font-semibold">Arm: SafeHarbor</span>
+        </div>
+        <pre class="font-mono text-xs sm:text-[13px] leading-relaxed text-slate-300 space-y-0.5"><code id="rust-code-display"></code></pre>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-slate-500 pb-4 font-mono">
+      Dibangun dengan 🦀 Rust Logic & Zero Undefined Behavior • Edukasi Hukum Digital UU No. 1/2024
+    </footer>
+  </div>
+
+  <!-- Hidden textarea fallback untuk clipboard -->
+  <textarea id="clipboard-helper" class="sr-only" aria-hidden="true"></textarea>
+
+  <script>
+    // State global untuk menyimpan ringkasan putusan terakhir
+    let currentSummaryForThreads = "";
+
+    // Preset skenario cepat sesuai spesifikasi
+    const PRESETS = {
+      kritik_publik: {
+        text: "Pelayanan di kantor ini lambat banget dan sistemnya sering down!",
+        context: "PublicInterestCriticism",
+        standing: "InstitutionOrCorporation",
+        authentic: true,
+        falsehood: false,
+        loss: false
+      },
+      institusi_gugat: {
+        text: "Perusahaan X diduga melakukan manipulasi laporan keuangan proyek daerah!",
+        context: "DefamatoryAttack",
+        standing: "InstitutionOrCorporation",
+        authentic: true,
+        falsehood: true,
+        loss: false
+      },
+      fitnah_individu: {
+        text: "Si Budi (NIK 3171xxxx) menggelapkan dana kas RT sebesar Rp 50 juta padahal tidak pernah terjadi.",
+        context: "DefamatoryAttack",
+        standing: "DirectIndividualVictim",
+        authentic: true,
+        falsehood: true,
+        loss: false
+      },
+      curhat_konsumen: {
+        text: "Beli kopi di kedai ini rasanya kayak air cucian beras, kapok balik lagi!",
+        context: "SatireOrOpinion",
+        standing: "InstitutionOrCorporation",
+        authentic: true,
+        falsehood: false,
+        loss: false
+      },
+      bukti_editan: {
+        text: "Screenshot chat WhatsApp hasil inspect element / editan Photoshop tanpa forensik digital.",
+        context: "DefamatoryAttack",
+        standing: "DirectIndividualVictim",
+        authentic: false,
+        falsehood: true,
+        loss: false
+      }
+    };
+
+    // Terapkan preset ke form
+    function applyPreset(key) {
+      const p = PRESETS[key];
+      if (!p) return;
+
+      document.getElementById("post-text").value = p.text;
+      document.getElementById("speech-context").value = p.context;
+      document.getElementById("legal-standing").value = p.standing;
+      document.getElementById("toggle-authentic").checked = p.authentic;
+      document.getElementById("toggle-falsehood").checked = p.falsehood;
+      document.getElementById("toggle-loss").checked = p.loss;
+
+      // Langsung jalankan putusan agar responsif & terasa instan
+      runSimulation();
+    }
+
+    // Evaluasi logika UU ITE versi Rust
+    function evaluateRustLaw(params) {
+      // 1. Cek Integritas Bukti (Pasal 6)
+      if (!params.authentic) {
+        return {
+          type: "error",
+          armId: "arm-evidence",
+          armName: "Guard: InvalidEvidenceIntegrity",
+          pill: "⚠ DITOLAK COMPILER (BUKTI TIDAK SAH)",
+          enumText: "Err(LegalError::InvalidEvidenceIntegrity)",
+          article: "Pasal 5 & Pasal 6 UU ITE",
+          explanation: "Bukti elektronik gagal memenuhi syarat autentikasi dan keutuhan informasi (misal: hasil editan tanpa metadata valid). Tidak sah sebagai alat bukti pengadilan."
+        };
+      }
+
+      // 2. Match SpeechContext
+      switch (params.context) {
+        case "PublicInterestCriticism":
+          return {
+            type: "safe",
+            armId: "arm-safe-harbor",
+            armName: "SafeHarbor: PublicInterestCriticism",
+            pill: "✓ BEBAS / DILINDUNGI KONSTITUSI",
+            enumText: "Ok(Verdict::ProtectedConstitutionalSpeech)",
+            article: "Pasal 27A ayat (3) UU No. 1/2024",
+            explanation: "Ucapan dilakukan untuk kepentingan umum (kritik layanan/kebijakan publik). UU No. 1/2024 secara tegas mengecualikan perbuatan ini dari pidana pencemaran nama baik."
+          };
+
+        case "SelfDefense":
+          return {
+            type: "safe",
+            armId: "arm-safe-harbor",
+            armName: "SafeHarbor: SelfDefense",
+            pill: "✓ BEBAS / PEMBELAAN DIRI",
+            enumText: "Ok(Verdict::ProtectedConstitutionalSpeech)",
+            article: "Pasal 27A ayat (3) UU No. 1/2024",
+            explanation: "Ucapan merupakan bentuk pembelaan diri yang sah atas tuduhan atau serangan sebelumnya. Tidak dapat dipidana berdasarkan Pasal 27A ayat (3)."
+          };
+
+        case "SatireOrOpinion":
+          return {
+            type: "safe",
+            armId: "arm-safe-harbor",
+            armName: "SafeHarbor: SatireOrOpinion",
+            pill: "✓ BEBAS / EKSPRESI OPINI & SATIRE",
+            enumText: "Ok(Verdict::ProtectedConstitutionalSpeech)",
+            article: "Pasal 28E UUD 1945 & SKB 3 Menteri",
+            explanation: "Penilaian subjektif, ulasan konsumen, atau satire bukan merupakan tuduhan fakta bohong. Compiler memblokir upaya kriminalisasi terhadap ekspresi opini."
+          };
+
+        case "DefamatoryAttack":
+          // Cek Legal Standing (Delik Aduan Absolut & Putusan MK)
+          if (params.standing === "InstitutionOrCorporation") {
+            return {
+              type: "error",
+              armId: "arm-standing-inst",
+              armName: "DelikAduan: InstitutionOrCorporation",
+              pill: "⚠ PASAL KARET DIBLOKIR (NO STANDING)",
+              enumText: "Err(LegalError::LackOfLegalStanding)",
+              article: "Pasal 27A jo. Putusan MK No. 105/PUU-XXII/2024",
+              explanation: "Institusi pemerintah, korporasi, atau badan hukum TIDAK memiliki kedudukan hukum (legal standing) untuk melaporkan pencemaran nama baik Pasal 27A. Hanya korban individu!"
+            };
+          }
+
+          if (params.standing === "ThirdPartyBystander") {
+            return {
+              type: "error",
+              armId: "arm-standing-bystander",
+              armName: "DelikAduan: ThirdPartyBystander",
+              pill: "⚠ PASAL KARET DIBLOKIR (DELIK ADUAN)",
+              enumText: "Err(LegalError::LackOfLegalStanding)",
+              article: "Pasal 45 ayat (5) UU No. 1/2024",
+              explanation: "Pencemaran nama baik adalah Delik Aduan Absolut. Pihak ketiga, simpatisan, atau netizen lain tidak berhak melapor mewakili korban langsung."
+            };
+          }
+
+          if (!params.falsehood) {
+            return {
+              type: "error",
+              armId: "arm-overbroad",
+              armName: "Guard: OverbroadInterpretationBlocked",
+              pill: "⚠ PASAL KARET DIBLOKIR (TANPA FAKTA BOHONG)",
+              enumText: "Err(LegalError::OverbroadInterpretationBlocked)",
+              article: "Pasal 27A ayat (1) UU No. 1/2024",
+              explanation: "Tidak ditemukan tuduhan fakta bohong yang dapat dibuktikan secara objektif. Tanpa unsur 'menuduhkan suatu hal yang tidak benar', tuntutan otomatis gugur."
+            };
+          }
+
+          return {
+            type: "danger",
+            armId: "arm-defamation-guilty",
+            armName: "Sanction: DefamatoryAttack",
+            pill: "🚨 TERBUKTI MELANGGAR (DELIK ADUAN SAH)",
+            enumText: "Ok(Verdict::CriminalSanction { article: \"Pasal 27A\" })",
+            article: "Pasal 27A jo. Pasal 45 ayat (4) UU No. 1/2024",
+            explanation: "Memenuhi seluruh unsur ketat: dilaporkan langsung oleh korban individu, bukti elektronik autentik, dan memuat tuduhan fakta bohong yang menyerang kehormatan."
+          };
+
+        case "ConsumerFraud":
+          if (!params.loss) {
+            return {
+              type: "error",
+              armId: "arm-fraud-noloss",
+              armName: "Guard: NoMaterialLoss",
+              pill: "⚠ PASAL KARET DIBLOKIR (NOL KERUGIAN)",
+              enumText: "Err(LegalError::OverbroadInterpretationBlocked)",
+              article: "Pasal 28 ayat (1) UU No. 1/2024",
+              explanation: "Pasal 28 ayat (1) mensyaratkan adanya kerugian materiil nyata bagi konsumen dalam transaksi elektronik. Tanpa kerugian materiil, gugatan ditolak."
+            };
+          }
+
+          return {
+            type: "danger",
+            armId: "arm-fraud-guilty",
+            armName: "Sanction: ConsumerFraud",
+            pill: "🚨 TERBUKTI PENIPUAN TRANSAKSI ELEKTRONIK",
+            enumText: "Ok(Verdict::CriminalSanction { article: \"Pasal 28(1)\" })",
+            article: "Pasal 28 ayat (1) jo. Pasal 45A ayat (1) UU No. 1/2024",
+            explanation: "Terbukti menyebarkan pemberitahuan bohong dalam transaksi elektronik yang mengakibatkan kerugian materiil nyata bagi konsumen."
+          };
+      }
+    }
+
+    // Render kode Rust dengan highlight pada cabang yang dieksekusi
+    function renderHighlightedRustCode(activeArmId) {
+      const codeLines = [
+        { id: "header", text: `pub fn adjudicate_speech(record: &ElectronicRecord, ctx: &SpeechContext, standing: &LegalStanding) -> Result<Verdict, LegalError> {` },
+        { id: "arm-evidence", text: `    if !record.is_authentic || !record.is_accessible { return Err(LegalError::InvalidEvidenceIntegrity); }` },
+        { id: "match-start", text: `    match ctx {` },
+        { id: "arm-safe-harbor", text: `        SpeechContext::PublicInterestCriticism | SpeechContext::SelfDefense | SpeechContext::SatireOrOpinion => Ok(Verdict::ProtectedConstitutionalSpeech),` },
+        { id: "def-open", text: `        SpeechContext::DefamatoryAttack { verifiable_false_statement, .. } => match standing {` },
+        { id: "arm-standing-inst", text: `            LegalStanding::InstitutionOrCorporation => Err(LegalError::LackOfLegalStanding), // Putusan MK` },
+        { id: "arm-standing-bystander", text: `            LegalStanding::ThirdPartyBystander => Err(LegalError::LackOfLegalStanding),      // Delik Aduan` },
+        { id: "arm-overbroad", text: `            LegalStanding::DirectIndividualVictim(_) if !verifiable_false_statement => Err(LegalError::OverbroadInterpretationBlocked),` },
+        { id: "arm-defamation-guilty", text: `            LegalStanding::DirectIndividualVictim(_) => Ok(Verdict::CriminalSanction { article: "Pasal 27A" }),` },
+        { id: "def-close", text: `        },` },
+        { id: "arm-fraud-noloss", text: `        SpeechContext::ConsumerFraud { material_loss_idr } if *material_loss_idr == 0 => Err(LegalError::OverbroadInterpretationBlocked),` },
+        { id: "arm-fraud-guilty", text: `        SpeechContext::ConsumerFraud { .. } => Ok(Verdict::CriminalSanction { article: "Pasal 28(1)" }),` },
+        { id: "match-close", text: `    }` },
+        { id: "footer", text: `}` }
+      ];
+
+      const container = document.getElementById("rust-code-display");
+      container.innerHTML = codeLines.map(line => {
+        const isHighlighted = line.id === activeArmId;
+        const safeText = line.text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+        if (isHighlighted) {
+          return `<div class="bg-[#F74C00]/20 border-l-4 border-[#F74C00] text-white font-semibold px-2.5 py-1 rounded-r-md my-0.5">${safeText}</div>`;
+        }
+        return `<div class="px-3 py-0.5 text-slate-400">${safeText}</div>`;
+      }).join("");
+    }
+
+    // Jalankan simulasi dengan animasi kompilasi singkat
+    function runSimulation() {
+      const btn = document.getElementById("run-btn");
+      const label = document.getElementById("run-label");
+      const icon = document.getElementById("run-icon");
+      const terminalLog = document.getElementById("terminal-log");
+      const compileBadge = document.getElementById("compile-badge");
+
+      // Ambil input user
+      const postText = document.getElementById("post-text").value.trim() || "(Kosong)";
+      const params = {
+        text: postText,
+        context: document.getElementById("speech-context").value,
+        standing: document.getElementById("legal-standing").value,
+        authentic: document.getElementById("toggle-authentic").checked,
+        falsehood: document.getElementById("toggle-falsehood").checked,
+        loss: document.getElementById("toggle-loss").checked
+      };
+
+      // Animasi compiling
+      btn.disabled = true;
+      btn.classList.add("opacity-80");
+      icon.textContent = "⏳";
+      label.textContent = "COMPILING (rustc --edition=2024)...";
+      compileBadge.textContent = "Compiling...";
+
+      terminalLog.innerHTML = `
+        <div><span class="text-[#F74C00] font-semibold">   Compiling</span> uu_ite_engine v1.2024.0 (/law/indonesia)</div>
+        <div class="text-slate-500 animate-pulse">   Checking borrow checker &amp; pasal karet guards...</div>
+      `;
+
+      setTimeout(() => {
+        const result = evaluateRustLaw(params);
+        const randomTime = (0.34 + Math.random() * 0.14).toFixed(2);
+
+        // Kembalikan state tombol
+        btn.disabled = false;
+        btn.classList.remove("opacity-80");
+        icon.textContent = "▶";
+        label.textContent = "JALANKAN PUTUSAN (cargo run)";
+        compileBadge.textContent = `Finished in ${randomTime}s`;
+
+        // Update terminal log
+        terminalLog.innerHTML = `
+          <div><span class="text-emerald-400 font-semibold">   Compiling</span> uu_ite_engine v1.2024.0 (/law/indonesia)</div>
+          <div><span class="text-emerald-400 font-semibold">    Finished</span> \`release\` profile [optimized] target(s) in ${randomTime}s</div>
+          <div><span class="text-emerald-400 font-semibold">     Running</span> \`target/release/sidang_uu_ite\`</div>
+          <div class="text-slate-400 pt-1">=&gt; Verdict: <span class="text-white font-semibold">${result.enumText}</span></div>
+        `;
+
+        // Update kartu vonis sesuai tema warna (hijau / amber / merah)
+        const card = document.getElementById("verdict-card");
+        const pill = document.getElementById("verdict-pill");
+        const enumEl = document.getElementById("verdict-enum");
+        const articleEl = document.getElementById("verdict-article");
+        const descEl = document.getElementById("verdict-desc");
+
+        card.className = "rounded-2xl border-2 p-5 sm:p-6 transition-all duration-300";
+        pill.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider w-fit";
+        enumEl.className = "text-base sm:text-xl font-mono font-bold break-all";
+
+        if (result.type === "safe") {
+          card.classList.add("bg-emerald-950/35", "border-emerald-500/70");
+          pill.classList.add("bg-emerald-500/20", "text-emerald-300");
+          enumEl.classList.add("text-emerald-300");
+        } else if (result.type === "error") {
+          card.classList.add("bg-amber-950/35", "border-amber-500/70");
+          pill.classList.add("bg-amber-500/20", "text-amber-300");
+          enumEl.classList.add("text-amber-300");
+        } else {
+          card.classList.add("bg-rose-950/40", "border-rose-500/80");
+          pill.classList.add("bg-rose-500/20", "text-rose-300");
+          enumEl.classList.add("text-rose-300");
+        }
+
+        pill.textContent = result.pill;
+        enumEl.textContent = result.enumText;
+        articleEl.textContent = result.article;
+        descEl.textContent = result.explanation;
+
+        // Update accordion kode Rust
+        document.getElementById("active-arm-label").textContent = result.armName;
+        renderHighlightedRustCode(result.armId);
+
+        // Siapkan teks siap share untuk Threads
+        const shortPost = postText.length > 80 ? postText.slice(0, 77) + "..." : postText;
+        currentSummaryForThreads =
+`🦀 Simulasi Sidang UU ITE (Rust Edition)
+Postingan: "${shortPost}"
+Konteks: ${params.context}
+Pelapor: ${params.standing}
+
+⚖️ Putusan Compiler:
+${result.enumText}
+Dasar: ${result.article}
+Status: ${result.pill.replace(/^[^\w]+/, '')}
+
+Zero unsafe_code, zero pasal karet! 💻✨`;
+      }, 380);
+    }
+
+    // Salin teks hasil ke clipboard dengan fallback execCommand
+    function copyForThreads() {
+      if (!currentSummaryForThreads) return;
+
+      const helper = document.getElementById("clipboard-helper");
+      helper.value = currentSummaryForThreads;
+      helper.classList.remove("sr-only");
+      helper.select();
+      helper.setSelectionRange(0, 99999);
+
+      try {
+        document.execCommand("copy");
+        showToast("Teks vonis berhasil disalin! Tinggal paste di Threads.");
+      } catch (err) {
+        showToast("Gagal menyalin teks, silakan salin manual.");
+      }
+
+      helper.classList.add("sr-only");
+    }
+
+    // Notifikasi toast
+    let toastTimer;
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      const msgEl = document.getElementById("toast-msg");
+      msgEl.textContent = message;
+
+      toast.classList.remove("translate-y-20", "opacity-0");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add("translate-y-20", "opacity-0");
+      }, 3000);
+    }
+
+    // Toggle buka/tutup accordion kode Rust
+    function toggleCodeAccordion() {
+      const body = document.getElementById("code-accordion-body");
+      const arrow = document.getElementById("accordion-arrow");
+      const isHidden = body.classList.contains("hidden");
+
+      if (isHidden) {
+        body.classList.remove("hidden");
+        arrow.classList.add("rotate-180");
+      } else {
+        body.classList.add("hidden");
+        arrow.classList.remove("rotate-180");
+      }
+    }
+
+    // Inisialisasi awal saat halaman dimuat
+    window.addEventListener("DOMContentLoaded", () => {
+      runSimulation();
+    });
+  </script>
+</body>
+</html>
